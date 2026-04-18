@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Voice Pokémon Explorer</title>
+    <title>AI Voice Pokémon Maze</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
     <style>
         body { margin: 0; padding: 0; background: #1a1a1a; color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow: hidden; }
@@ -54,34 +54,57 @@
         <div class="modal-content">
             <div class="lang-section">
                 <h2>How to Play</h2>
-                <p>1. Select a Pokémon from the top menu.</p>
+                <p>1. Select your Pokémon partner.</p>
                 <div class="command-list">
-                    <p><b>Movement:</b> Say "Go Up", "Go Down", "Go Left", "Go Right" (or just the direction).</p>
-                    <p><b>Visuals:</b> Say "Red", "Green", "Blue", or "Reset" to change colors.</p>
-                    <p><b>Size:</b> Say "Big", "Small", or "Normal".</p>
-                    <p><b>Action:</b> Say "Jump" to leap, or <span class="highlight">"Don't Jump"</span> to cancel.</p>
+                    <p><b>Movement:</b> "Go Up", "Go Down", "Go Left", "Go Right" to navigate the maze.</p>
+                    <p><b>Visuals:</b> "Red", "Green", "Blue", or "Reset" to change colors.</p>
+                    <p><b>Size:</b> "Big", "Small", or "Normal".</p>
+                    <p><b>Action:</b> "Jump" to leap in place, or <span class="highlight">"Don't Jump"</span> to cancel.</p>
                 </div>
-                <p><i>* Speak clearly and loud!</i></p>
             </div>
             <div class="lang-section">
                 <h2>遊戲說明</h2>
-                <p>1. 從頂部選單召喚你的寶可夢夥伴。</p>
+                <p>1. 召喚你的寶可夢夥伴。</p>
                 <div class="command-list">
-                    <p><b>移動指令：</b> 說 "Go Up", "Go Down", "Go Left", "Go Right" (只說單字也可以喔！)</p>
+                    <p><b>移動指令：</b> 說 "Go Up", "Go Down", "Go Left", "Go Right" 在迷宮中移動。</p>
                     <p><b>視覺指令：</b> 說 "Red", "Green", "Blue", 或 "Reset" 改變顏色。</p>
                     <p><b>尺寸指令：</b> 說 "Big", "Small", 或 "Normal" 改變大小。</p>
-                    <p><b>特殊動作：</b> 說 "Jump" 讓角色跳躍，或說 <span class="highlight">"Don't Jump"</span> 取消跳躍。</p>
+                    <p><b>特殊動作：</b> 說 "Jump" 原地跳躍，或說 <span class="highlight">"Don't Jump"</span> 取消。</p>
                 </div>
-                <p><i>* 大膽開口，唸錯了電腦也會包容你的！</i></p>
             </div>
         </div>
         <button id="close-btn" onclick="toggleInstructions()">Ready / 準備出發</button>
     </div>
 
     <script>
-        // 遊戲狀態變數
-        let player = { x: 0, y: 0, size: 80, img: null, tintColor: null, vy: 0, targetX: 0, targetY: 0 };
-        let enemies = [];
+        // --- 迷宮地圖設定 (0=路, 1=牆) ---
+        const mazeGrid = [
+            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            [1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1],
+            [1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1],
+            [1, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1],
+            [1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1],
+            [1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+            [1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1],
+            [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+        ];
+        
+        const tileSize = 60; // 每個格子的像素大小
+        let mapWidth, mapHeight;
+
+        // 玩家物件 (r=row, c=col 分別代表在迷宮陣列中的位置)
+        let player = { 
+            c: 1, r: 1,       // 陣列座標 (起點在左上角)
+            x: 0, y: 0,       // 實際畫布座標 (用於平滑移動)
+            yOffset: 0,       // 用於處理跳躍的視覺高度
+            vy: 0,            // 跳躍速度
+            baseSize: 45,     // 基礎大小
+            scale: 1,         // 尺寸縮放比例
+            img: null, 
+            tintColor: null 
+        };
+
         let lastCommand = "None";
         let isModalOpen = false;
 
@@ -101,175 +124,162 @@
                 select.onchange = async (e) => {
                     if(!e.target.value) return;
                     const pData = await fetch(e.target.value).then(r => r.json());
-                    // 抓取官方高畫質圖片
                     player.img = loadImage(pData.sprites.other['official-artwork'].front_default);
                 };
             } catch (err) {
                 console.error("API Error:", err);
-                document.getElementById('poke-select').innerHTML = '<option>API Load Failed</option>';
             }
         }
 
         // --- 2. p5.js 遊戲主邏輯 ---
         function setup() {
             createCanvas(windowWidth, windowHeight);
-            player.x = width / 2;
-            player.y = height / 2;
-            player.targetX = player.x;
-            player.targetY = player.y;
+            mapWidth = mazeGrid[0].length * tileSize;
+            mapHeight = mazeGrid.length * tileSize;
             
-            // 產生隨機漂浮的敵人（紅球）
-            for(let i=0; i<6; i++) {
-                enemies.push({
-                    x: random(width), y: random(height), 
-                    vx: random(-3, 3), vy: random(-3, 3), size: 30
-                });
-            }
+            // 初始化玩家的實際畫布座標
+            player.x = player.c * tileSize + tileSize/2;
+            player.y = player.r * tileSize + tileSize/2;
             
             loadPokeList();
             initSpeech();
-            // 遊戲一開始自動彈出說明視窗
-            toggleInstructions();
+            toggleInstructions(); // 自動彈出說明
         }
 
         function draw() {
-            background(20, 24, 35);
-            
-            // 繪製科技感背景格線
-            stroke(40);
-            for(let i=0; i<width; i+=50) line(i, 0, i, height);
-            for(let j=0; j<height; j+=50) line(0, j, width, j);
+            background(20);
 
-            // 處理敵人邏輯
-            noStroke();
-            fill(255, 100, 100, 200);
-            enemies.forEach(e => {
-                ellipse(e.x, e.y, e.size);
-                e.x += e.vx; e.y += e.vy;
-                // 碰到邊界反彈
-                if(e.x < 0 || e.x > width) e.vx *= -1;
-                if(e.y < 0 || e.y > height) e.vy *= -1;
-                
-                // 簡單碰撞偵測 (Warning 提示)
-                if(dist(player.x, player.y, e.x, e.y) < (player.size/2 + e.size/2)) {
-                    fill(255, 0, 0);
-                    textSize(40); textAlign(CENTER); text("⚠️ CAREFUL!", player.x, player.y - 80);
+            // 將畫布中心對齊迷宮
+            let offsetX = (width - mapWidth) / 2;
+            let offsetY = (height - mapHeight) / 2 + 30; // 往下壓一點避開 UI
+            translate(offsetX, offsetY);
+
+            // 繪製迷宮
+            for (let r = 0; r < mazeGrid.length; r++) {
+                for (let c = 0; c < mazeGrid[r].length; c++) {
+                    if (mazeGrid[r][c] === 1) {
+                        fill(50, 70, 90);  // 牆壁顏色
+                        stroke(30);
+                        rect(c * tileSize, r * tileSize, tileSize, tileSize, 8);
+                    } else {
+                        fill(30, 35, 40);  // 道路顏色
+                        noStroke();
+                        rect(c * tileSize, r * tileSize, tileSize, tileSize);
+                    }
                 }
-            });
-
-            // 玩家平滑移動 (Lerp 讓視覺更流暢)
-            player.x = lerp(player.x, player.targetX, 0.1);
-            player.y = lerp(player.y, player.targetY, 0.1);
-            
-            // 處理跳躍重力
-            player.y += player.vy;
-            if(player.y < height - 150) {
-                player.vy += 0.8; // 給予往下掉的重力
-            } else { 
-                player.y = height - 150; 
-                player.vy = 0; 
-                if(player.targetY > height-150) player.targetY = height-150; // 限制目標點不要掉出地板
             }
 
-            // 繪製玩家角色
-            push();
-            if(player.tintColor) tint(player.tintColor); // 套用語音變色
-            imageMode(CENTER);
-            if(player.img) {
-                image(player.img, player.x, player.y, player.size, player.size);
+            // 玩家平滑移動到目標格子
+            let targetX = player.c * tileSize + tileSize/2;
+            let targetY = player.r * tileSize + tileSize/2;
+            player.x = lerp(player.x, targetX, 0.2);
+            player.y = lerp(player.y, targetY, 0.2);
+
+            // 處理跳躍物理 (純視覺表現)
+            player.yOffset += player.vy;
+            if(player.yOffset < 0) {
+                player.vy += 1.5; // 重力
             } else {
-                fill(255, 203, 5); ellipse(player.x, player.y, player.size);
-                fill(0); textSize(12); textAlign(CENTER); text("Waiting...", player.x, player.y);
+                player.yOffset = 0;
+                player.vy = 0;
+            }
+
+            // 繪製玩家
+            push();
+            if(player.tintColor) tint(player.tintColor);
+            imageMode(CENTER);
+            let finalSize = player.baseSize * player.scale;
+            
+            if(player.img) {
+                // y 座標加上 yOffset 來呈現跳起來的感覺
+                image(player.img, player.x, player.y + player.yOffset, finalSize, finalSize);
+            } else {
+                fill(255, 203, 5); 
+                ellipse(player.x, player.y + player.yOffset, finalSize);
+                fill(0); textSize(10); textAlign(CENTER); text("Wait...", player.x, player.y + player.yOffset);
             }
             pop();
 
-            // 底部 HUD：顯示當前聽到的指令
+            // 顯示最新指令
+            resetMatrix(); // 離開迷宮的 translate 座標系
             fill(255); textSize(24); textAlign(CENTER); textStyle(BOLD);
             text("Last Heard: [ " + lastCommand.toUpperCase() + " ]", width/2, height - 30);
         }
 
-        // --- 3. 高包容性聲控系統 ---
+        // --- 3. 高包容性聲控系統 & 迷宮碰撞判斷 ---
         function initSpeech() {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (!SpeechRecognition) {
-                document.getElementById('status').textContent = "Browser Not Supported ❌";
-                document.getElementById('status').style.color = "red";
-                return;
-            }
+            if (!SpeechRecognition) return;
 
             const recognition = new SpeechRecognition();
-            recognition.lang = 'en-US'; // 強制練習英文
+            recognition.lang = 'en-US';
             recognition.continuous = true;
             recognition.interimResults = false;
 
-            recognition.onstart = () => {
-                document.getElementById('status').textContent = "Voice: Listening... 🎤";
-                console.log("✅ 麥克風已啟動，開始接收語音");
-            };
-
-            recognition.onerror = (e) => {
-                console.error("❌ 語音辨識錯誤:", e.error);
-                if(e.error === 'not-allowed') alert("請點擊網址列左側的鎖頭 🔒，允許麥克風權限才能玩喔！");
-            };
-
-            // 防斷線機制：一旦停止就自動重新啟動
-            recognition.onend = () => { recognition.start(); }; 
+            recognition.onstart = () => document.getElementById('status').textContent = "Voice: Listening... 🎤";
+            recognition.onerror = () => document.getElementById('status').textContent = "Voice: Error ❌";
+            recognition.onend = () => recognition.start(); 
 
             recognition.onresult = (event) => {
-                // 將語音轉為小寫並去除前後空白
                 const result = event.results[event.results.length - 1][0].transcript.trim().toLowerCase();
                 lastCommand = result;
                 console.log("🗣️ 電腦聽到了:", result);
 
-                const step = 120; // 每次移動的距離
-
                 // =====================================
-                // 教學亮點 1：邏輯優先級 (攔截否定句)
+                // 動作與跳躍指令
                 // =====================================
                 if (result.includes("don't jump") || result.includes("do not jump")) {
-                    player.vy = 0; // 強制把向上速度歸零
-                    console.log("執行：取消跳躍");
+                    player.vy = 0; 
+                    player.yOffset = 0;
                 } 
-                else if (result.includes("jump")) {
-                    player.vy = -18; // 給予向上跳的速度
+                else if (result.includes("jump") && player.yOffset === 0) {
+                    player.vy = -15; // 給予向上跳的初速度
                 }
 
                 // =====================================
-                // 教學亮點 2：高包容性指令 (支援片語與單字)
+                // 迷宮移動邏輯 (包含撞牆判斷)
                 // =====================================
-                if (result.includes("go up") || result.includes("up")) player.targetY -= step;
-                if (result.includes("go down") || result.includes("down")) player.targetY += step;
-                if (result.includes("go left") || result.includes("left")) player.targetX -= step;
-                if (result.includes("go right") || result.includes("right")) player.targetX += step;
+                let nextC = player.c;
+                let nextR = player.r;
+
+                if (result.includes("go up") || result.includes("up")) nextR--;
+                else if (result.includes("go down") || result.includes("down")) nextR++;
+                else if (result.includes("go left") || result.includes("left")) nextC--;
+                else if (result.includes("go right") || result.includes("right")) nextC++;
+
+                // 判斷目標格子是否超出邊界，或是撞到牆壁 (數值為 1)
+                if (nextR >= 0 && nextR < mazeGrid.length && nextC >= 0 && nextC < mazeGrid[0].length) {
+                    if (mazeGrid[nextR][nextC] === 0) {
+                        player.c = nextC; // 允許移動
+                        player.r = nextR;
+                    } else {
+                        console.log("撞到牆壁啦！");
+                    }
+                }
 
                 // =====================================
-                // 階段二：屬性變化
+                // 屬性變化
                 // =====================================
                 if (result.includes("red")) player.tintColor = color(255, 100, 100);
                 if (result.includes("green")) player.tintColor = color(100, 255, 100);
                 if (result.includes("blue")) player.tintColor = color(100, 100, 255);
                 if (result.includes("reset") || result.includes("normal color")) player.tintColor = null;
 
-                if (result.includes("big") || result.includes("large")) player.size = 180;
-                if (result.includes("small") || result.includes("tiny")) player.size = 40;
-                if (result.includes("normal") || result.includes("regular size")) player.size = 80;
+                if (result.includes("big") || result.includes("large")) player.scale = 1.8;
+                if (result.includes("small") || result.includes("tiny")) player.scale = 0.5;
+                if (result.includes("normal") || result.includes("regular size")) player.scale = 1;
             };
 
             recognition.start();
         }
 
-        // --- 4. UI 互動邏輯 ---
+        // --- 4. UI 互動 ---
         function toggleInstructions() {
             isModalOpen = !isModalOpen;
             document.getElementById('inst-modal').style.display = isModalOpen ? 'block' : 'none';
         }
 
-        // 視窗縮放時自動調整畫布大小
-        function windowResized() {
-            resizeCanvas(windowWidth, windowHeight);
-            // 確保玩家不會掉出新視窗外
-            if(player.targetY > height-150) player.targetY = height-150;
-        }
+        function windowResized() { resizeCanvas(windowWidth, windowHeight); }
     </script>
 </body>
 </html>
