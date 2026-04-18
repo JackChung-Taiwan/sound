@@ -15,36 +15,38 @@
             padding: 0 20px; box-sizing: border-box; z-index: 10; gap: 15px;
         }
 
-        #status { font-size: 14px; color: #00ff00; min-width: 150px; }
+        #status { font-size: 14px; color: #00ff00; min-width: 150px; font-weight: bold; }
         
         select, button { 
             padding: 8px 15px; border-radius: 5px; border: none; cursor: pointer; font-size: 14px; 
         }
 
-        button { background: #ffcb05; color: #2a75bb; font-weight: bold; }
-        button:hover { background: #f2bc00; }
+        button { background: #ffcb05; color: #2a75bb; font-weight: bold; transition: 0.2s; }
+        button:hover { background: #f2bc00; transform: scale(1.05); }
 
         /* 說明視窗 (Modal) */
         #inst-modal { 
             display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
             background: #2c3e50; padding: 30px; border: 3px solid #ffcb05; border-radius: 15px;
-            z-index: 100; max-width: 800px; width: 90%; box-shadow: 0 0 50px rgba(0,0,0,0.5);
+            z-index: 100; max-width: 800px; width: 90%; box-shadow: 0 0 50px rgba(0,0,0,0.8);
         }
 
         .modal-content { display: flex; gap: 30px; }
         .lang-section { flex: 1; }
         .lang-section h2 { color: #ffcb05; border-bottom: 1px solid #555; padding-bottom: 10px; }
-        .command-list { background: rgba(0,0,0,0.2); padding: 10px; border-radius: 5px; }
+        .command-list { background: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px; line-height: 1.6; }
         .command-list b { color: #00d2ff; }
+        .highlight { color: #ff7675; }
 
         #close-btn { display: block; margin: 20px auto 0; padding: 10px 30px; background: #e74c3c; color: white; }
+        #close-btn:hover { background: #c0392b; }
     </style>
 </head>
 <body>
 
     <div id="controls">
-        <div id="status">Voice: Starting...</div>
-        <select id="poke-select"><option value="">Loading Pokémon...</option></select>
+        <div id="status">Voice: Starting... ⏳</div>
+        <select id="poke-select"><option value="">Loading Pokémon API...</option></select>
         <button onclick="toggleInstructions()">Game Instructions / 遊戲說明</button>
     </div>
 
@@ -52,37 +54,38 @@
         <div class="modal-content">
             <div class="lang-section">
                 <h2>How to Play</h2>
-                <p>1. Select a Pokémon from the list.</p>
+                <p>1. Select a Pokémon from the top menu.</p>
                 <div class="command-list">
-                    <p><b>Movement:</b> "Up", "Down", "Left", "Right"</p>
-                    <p><b>Visuals:</b> "Red", "Green", "Blue", "Reset"</p>
-                    <p><b>Size:</b> "Big", "Small", "Normal"</p>
-                    <p><b>Action:</b> "Jump"</p>
+                    <p><b>Movement:</b> Say "Go Up", "Go Down", "Go Left", "Go Right" (or just the direction).</p>
+                    <p><b>Visuals:</b> Say "Red", "Green", "Blue", or "Reset" to change colors.</p>
+                    <p><b>Size:</b> Say "Big", "Small", or "Normal".</p>
+                    <p><b>Action:</b> Say "Jump" to leap, or <span class="highlight">"Don't Jump"</span> to cancel.</p>
                 </div>
                 <p><i>* Speak clearly and loud!</i></p>
             </div>
             <div class="lang-section">
                 <h2>遊戲說明</h2>
-                <p>1. 從選單中選擇一隻寶可夢。</p>
+                <p>1. 從頂部選單召喚你的寶可夢夥伴。</p>
                 <div class="command-list">
-                    <p><b>移動指令：</b> "Up", "Down", "Left", "Right"</p>
-                    <p><b>視覺指令：</b> "Red", "Green", "Blue", "Reset"</p>
-                    <p><b>尺寸指令：</b> "Big", "Small", "Normal"</p>
-                    <p><b>特殊動作：</b> "Jump"</p>
+                    <p><b>移動指令：</b> 說 "Go Up", "Go Down", "Go Left", "Go Right" (只說單字也可以喔！)</p>
+                    <p><b>視覺指令：</b> 說 "Red", "Green", "Blue", 或 "Reset" 改變顏色。</p>
+                    <p><b>尺寸指令：</b> 說 "Big", "Small", 或 "Normal" 改變大小。</p>
+                    <p><b>特殊動作：</b> 說 "Jump" 讓角色跳躍，或說 <span class="highlight">"Don't Jump"</span> 取消跳躍。</p>
                 </div>
-                <p><i>* 練習發音要清晰大聲喔！</i></p>
+                <p><i>* 大膽開口，唸錯了電腦也會包容你的！</i></p>
             </div>
         </div>
-        <button id="close-btn" onclick="toggleInstructions()">Close / 關閉</button>
+        <button id="close-btn" onclick="toggleInstructions()">Ready / 準備出發</button>
     </div>
 
     <script>
+        // 遊戲狀態變數
         let player = { x: 0, y: 0, size: 80, img: null, tintColor: null, vy: 0, targetX: 0, targetY: 0 };
         let enemies = [];
         let lastCommand = "None";
         let isModalOpen = false;
 
-        // --- 1. PokéAPI 角色初始化 ---
+        // --- 1. 串接 PokéAPI ---
         async function loadPokeList() {
             try {
                 const res = await fetch('https://pokeapi.co/api/v2/pokemon?limit=151');
@@ -103,6 +106,7 @@
                 };
             } catch (err) {
                 console.error("API Error:", err);
+                document.getElementById('poke-select').innerHTML = '<option>API Load Failed</option>';
             }
         }
 
@@ -114,7 +118,7 @@
             player.targetX = player.x;
             player.targetY = player.y;
             
-            // 初始化敵人
+            // 產生隨機漂浮的敵人（紅球）
             for(let i=0; i<6; i++) {
                 enemies.push({
                     x: random(width), y: random(height), 
@@ -124,121 +128,147 @@
             
             loadPokeList();
             initSpeech();
+            // 遊戲一開始自動彈出說明視窗
+            toggleInstructions();
         }
 
         function draw() {
             background(20, 24, 35);
             
-            // 繪製格線背景感 (更像遊戲)
+            // 繪製科技感背景格線
             stroke(40);
             for(let i=0; i<width; i+=50) line(i, 0, i, height);
             for(let j=0; j<height; j+=50) line(0, j, width, j);
 
-            // 繪製敵人
+            // 處理敵人邏輯
             noStroke();
             fill(255, 100, 100, 200);
             enemies.forEach(e => {
                 ellipse(e.x, e.y, e.size);
                 e.x += e.vx; e.y += e.vy;
+                // 碰到邊界反彈
                 if(e.x < 0 || e.x > width) e.vx *= -1;
                 if(e.y < 0 || e.y > height) e.vy *= -1;
                 
-                // 碰撞偵測
+                // 簡單碰撞偵測 (Warning 提示)
                 if(dist(player.x, player.y, e.x, e.y) < (player.size/2 + e.size/2)) {
                     fill(255, 0, 0);
-                    textSize(40); text("⚠️ CAREFUL!", player.x - 80, player.y - 80);
+                    textSize(40); textAlign(CENTER); text("⚠️ CAREFUL!", player.x, player.y - 80);
                 }
             });
 
-            // 玩家平滑移動
+            // 玩家平滑移動 (Lerp 讓視覺更流暢)
             player.x = lerp(player.x, player.targetX, 0.1);
             player.y = lerp(player.y, player.targetY, 0.1);
             
-            // 跳躍物理
+            // 處理跳躍重力
             player.y += player.vy;
-            if(player.y < height - 150) player.vy += 0.8; 
-            else { player.y = height - 150; player.vy = 0; if(player.targetY > height-150) player.targetY = height-150; }
+            if(player.y < height - 150) {
+                player.vy += 0.8; // 給予往下掉的重力
+            } else { 
+                player.y = height - 150; 
+                player.vy = 0; 
+                if(player.targetY > height-150) player.targetY = height-150; // 限制目標點不要掉出地板
+            }
 
-            // 繪製玩家
+            // 繪製玩家角色
             push();
-            if(player.tintColor) tint(player.tintColor);
+            if(player.tintColor) tint(player.tintColor); // 套用語音變色
             imageMode(CENTER);
             if(player.img) {
                 image(player.img, player.x, player.y, player.size, player.size);
             } else {
                 fill(255, 203, 5); ellipse(player.x, player.y, player.size);
-                fill(0); textSize(12); textAlign(CENTER); text("Loading...", player.x, player.y);
+                fill(0); textSize(12); textAlign(CENTER); text("Waiting...", player.x, player.y);
             }
             pop();
 
-            // 底部顯示當前語音辨識結果
-            fill(255); textSize(20); textAlign(CENTER);
-            text("Last Voice Command: " + lastCommand.toUpperCase(), width/2, height - 30);
+            // 底部 HUD：顯示當前聽到的指令
+            fill(255); textSize(24); textAlign(CENTER); textStyle(BOLD);
+            text("Last Heard: [ " + lastCommand.toUpperCase() + " ]", width/2, height - 30);
         }
 
-        // --- 3. 聲控系統 (Debug 加強版) ---
+        // --- 3. 高包容性聲控系統 ---
         function initSpeech() {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (!SpeechRecognition) {
-                document.getElementById('status').textContent = "Browser not supported!";
+                document.getElementById('status').textContent = "Browser Not Supported ❌";
+                document.getElementById('status').style.color = "red";
                 return;
             }
 
             const recognition = new SpeechRecognition();
-            recognition.lang = 'en-US';
+            recognition.lang = 'en-US'; // 強制練習英文
             recognition.continuous = true;
             recognition.interimResults = false;
 
             recognition.onstart = () => {
                 document.getElementById('status').textContent = "Voice: Listening... 🎤";
-                console.log("Speech System Active");
+                console.log("✅ 麥克風已啟動，開始接收語音");
             };
 
             recognition.onerror = (e) => {
-                console.error("Speech Error:", e.error);
-                if(e.error === 'not-allowed') alert("請點擊網址列左側鎖頭，允許麥克風權限。");
+                console.error("❌ 語音辨識錯誤:", e.error);
+                if(e.error === 'not-allowed') alert("請點擊網址列左側的鎖頭 🔒，允許麥克風權限才能玩喔！");
             };
 
-            recognition.onend = () => { recognition.start(); }; // 斷掉自動重連
+            // 防斷線機制：一旦停止就自動重新啟動
+            recognition.onend = () => { recognition.start(); }; 
 
             recognition.onresult = (event) => {
+                // 將語音轉為小寫並去除前後空白
                 const result = event.results[event.results.length - 1][0].transcript.trim().toLowerCase();
                 lastCommand = result;
-                console.log("Heard:", result);
+                console.log("🗣️ 電腦聽到了:", result);
 
-                // 移動
-                const step = 100;
-                if(result.includes("up")) player.targetY -= step;
-                if(result.includes("down")) player.targetY += step;
-                if(result.includes("left")) player.targetX -= step;
-                if(result.includes("right")) player.targetX += step;
+                const step = 120; // 每次移動的距離
 
-                // 顏色
-                if(result.includes("red")) player.tintColor = color(255, 100, 100);
-                if(result.includes("green")) player.tintColor = color(100, 255, 100);
-                if(result.includes("blue")) player.tintColor = color(100, 100, 255);
-                if(result.includes("reset")) player.tintColor = null;
+                // =====================================
+                // 教學亮點 1：邏輯優先級 (攔截否定句)
+                // =====================================
+                if (result.includes("don't jump") || result.includes("do not jump")) {
+                    player.vy = 0; // 強制把向上速度歸零
+                    console.log("執行：取消跳躍");
+                } 
+                else if (result.includes("jump")) {
+                    player.vy = -18; // 給予向上跳的速度
+                }
 
-                // 尺寸
-                if(result.includes("big")) player.size = 180;
-                if(result.includes("small")) player.size = 40;
-                if(result.includes("normal")) player.size = 80;
+                // =====================================
+                // 教學亮點 2：高包容性指令 (支援片語與單字)
+                // =====================================
+                if (result.includes("go up") || result.includes("up")) player.targetY -= step;
+                if (result.includes("go down") || result.includes("down")) player.targetY += step;
+                if (result.includes("go left") || result.includes("left")) player.targetX -= step;
+                if (result.includes("go right") || result.includes("right")) player.targetX += step;
 
-                // 特殊
-                if(result.includes("jump")) player.vy = -15;
+                // =====================================
+                // 階段二：屬性變化
+                // =====================================
+                if (result.includes("red")) player.tintColor = color(255, 100, 100);
+                if (result.includes("green")) player.tintColor = color(100, 255, 100);
+                if (result.includes("blue")) player.tintColor = color(100, 100, 255);
+                if (result.includes("reset") || result.includes("normal color")) player.tintColor = null;
+
+                if (result.includes("big") || result.includes("large")) player.size = 180;
+                if (result.includes("small") || result.includes("tiny")) player.size = 40;
+                if (result.includes("normal") || result.includes("regular size")) player.size = 80;
             };
 
             recognition.start();
         }
 
-        // --- 4. UI 互動 ---
+        // --- 4. UI 互動邏輯 ---
         function toggleInstructions() {
             isModalOpen = !isModalOpen;
             document.getElementById('inst-modal').style.display = isModalOpen ? 'block' : 'none';
         }
 
+        // 視窗縮放時自動調整畫布大小
         function windowResized() {
             resizeCanvas(windowWidth, windowHeight);
+            // 確保玩家不會掉出新視窗外
+            if(player.targetY > height-150) player.targetY = height-150;
         }
     </script>
 </body>
