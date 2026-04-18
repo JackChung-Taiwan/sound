@@ -37,6 +37,7 @@
         .command-list { background: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px; line-height: 1.6; }
         .command-list b { color: #00d2ff; }
         .highlight { color: #ff7675; }
+        .combo-tip { color: #f1c40f; font-weight: bold; margin-top: 10px; }
 
         #close-btn { display: block; margin: 20px auto 0; padding: 10px 30px; background: #e74c3c; color: white; }
         #close-btn:hover { background: #c0392b; }
@@ -56,18 +57,20 @@
                 <h2>How to Play</h2>
                 <p>1. Select your Pokémon partner.</p>
                 <div class="command-list">
-                    <p><b>Movement:</b> "Go Up", "Go Down", "Go Left", "Go Right" to navigate the maze.</p>
-                    <p><b>Visuals:</b> "Red", "Green", "Blue", or "Reset" to change colors.</p>
-                    <p><b>Size:</b> "Big", "Small", or "Normal".</p>
-                    <p><b>Action:</b> "Jump" to leap in place, or <span class="highlight">"Don't Jump"</span> to cancel.</p>
+                    <p><b>Movement:</b> "Up", "Down", "Left", "Right"</p>
+                    <p class="combo-tip">🔥 Combo Mode: Say multiple commands at once! (e.g., "Up up left")</p>
+                    <p><b>Visuals:</b> "Red", "Green", "Blue", or "Reset"</p>
+                    <p><b>Size:</b> "Big", "Small", or "Normal"</p>
+                    <p><b>Action:</b> "Jump" to leap, or <span class="highlight">"Don't Jump"</span> to cancel.</p>
                 </div>
             </div>
             <div class="lang-section">
                 <h2>遊戲說明</h2>
-                <p>1. 召喚你的寶可夢夥伴。</p>
+                <p>1. 從左上角召喚你的寶可夢夥伴。</p>
                 <div class="command-list">
-                    <p><b>移動指令：</b> 說 "Go Up", "Go Down", "Go Left", "Go Right" 在迷宮中移動。</p>
-                    <p><b>視覺指令：</b> 說 "Red", "Green", "Blue", 或 "Reset" 改變顏色。</p>
+                    <p><b>移動指令：</b> 說 "Up", "Down", "Left", "Right" 走迷宮。</p>
+                    <p class="combo-tip">🔥 連續技模式：你可以一口氣連走好幾步！(例如說："Up up left")</p>
+                    <p><b>視覺指令：</b> 說 "Red", "Green", "Blue", 或 "Reset" 變色。</p>
                     <p><b>尺寸指令：</b> 說 "Big", "Small", 或 "Normal" 改變大小。</p>
                     <p><b>特殊動作：</b> 說 "Jump" 原地跳躍，或說 <span class="highlight">"Don't Jump"</span> 取消。</p>
                 </div>
@@ -90,17 +93,17 @@
             [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
         ];
         
-        const tileSize = 60; // 每個格子的像素大小
+        const tileSize = 60; 
         let mapWidth, mapHeight;
 
-        // 玩家物件 (r=row, c=col 分別代表在迷宮陣列中的位置)
+        // 玩家物件
         let player = { 
-            c: 1, r: 1,       // 陣列座標 (起點在左上角)
-            x: 0, y: 0,       // 實際畫布座標 (用於平滑移動)
-            yOffset: 0,       // 用於處理跳躍的視覺高度
-            vy: 0,            // 跳躍速度
-            baseSize: 45,     // 基礎大小
-            scale: 1,         // 尺寸縮放比例
+            c: 1, r: 1,       
+            x: 0, y: 0,       
+            yOffset: 0,       
+            vy: 0,            
+            baseSize: 45,     
+            scale: 1,         
             img: null, 
             tintColor: null 
         };
@@ -137,48 +140,47 @@
             mapWidth = mazeGrid[0].length * tileSize;
             mapHeight = mazeGrid.length * tileSize;
             
-            // 初始化玩家的實際畫布座標
             player.x = player.c * tileSize + tileSize/2;
             player.y = player.r * tileSize + tileSize/2;
             
             loadPokeList();
             initSpeech();
-            toggleInstructions(); // 自動彈出說明
+            toggleInstructions(); 
         }
 
         function draw() {
             background(20);
 
-            // 將畫布中心對齊迷宮
+            // 置中迷宮
             let offsetX = (width - mapWidth) / 2;
-            let offsetY = (height - mapHeight) / 2 + 30; // 往下壓一點避開 UI
+            let offsetY = (height - mapHeight) / 2 + 30;
             translate(offsetX, offsetY);
 
             // 繪製迷宮
             for (let r = 0; r < mazeGrid.length; r++) {
                 for (let c = 0; c < mazeGrid[r].length; c++) {
                     if (mazeGrid[r][c] === 1) {
-                        fill(50, 70, 90);  // 牆壁顏色
+                        fill(50, 70, 90);
                         stroke(30);
                         rect(c * tileSize, r * tileSize, tileSize, tileSize, 8);
                     } else {
-                        fill(30, 35, 40);  // 道路顏色
+                        fill(30, 35, 40);
                         noStroke();
                         rect(c * tileSize, r * tileSize, tileSize, tileSize);
                     }
                 }
             }
 
-            // 玩家平滑移動到目標格子
+            // 平滑移動 (Lerp) - 展現連續技的滑順感
             let targetX = player.c * tileSize + tileSize/2;
             let targetY = player.r * tileSize + tileSize/2;
             player.x = lerp(player.x, targetX, 0.2);
             player.y = lerp(player.y, targetY, 0.2);
 
-            // 處理跳躍物理 (純視覺表現)
+            // 跳躍物理
             player.yOffset += player.vy;
             if(player.yOffset < 0) {
-                player.vy += 1.5; // 重力
+                player.vy += 1.5;
             } else {
                 player.yOffset = 0;
                 player.vy = 0;
@@ -191,7 +193,6 @@
             let finalSize = player.baseSize * player.scale;
             
             if(player.img) {
-                // y 座標加上 yOffset 來呈現跳起來的感覺
                 image(player.img, player.x, player.y + player.yOffset, finalSize, finalSize);
             } else {
                 fill(255, 203, 5); 
@@ -201,12 +202,12 @@
             pop();
 
             // 顯示最新指令
-            resetMatrix(); // 離開迷宮的 translate 座標系
+            resetMatrix();
             fill(255); textSize(24); textAlign(CENTER); textStyle(BOLD);
             text("Last Heard: [ " + lastCommand.toUpperCase() + " ]", width/2, height - 30);
         }
 
-        // --- 3. 高包容性聲控系統 & 迷宮碰撞判斷 ---
+        // --- 3. 升級版：支援連續技的聲控系統 ---
         function initSpeech() {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (!SpeechRecognition) return;
@@ -226,39 +227,46 @@
                 console.log("🗣️ 電腦聽到了:", result);
 
                 // =====================================
-                // 動作與跳躍指令
+                // 1. 動作指令 (優先攔截否定句)
                 // =====================================
                 if (result.includes("don't jump") || result.includes("do not jump")) {
                     player.vy = 0; 
                     player.yOffset = 0;
                 } 
                 else if (result.includes("jump") && player.yOffset === 0) {
-                    player.vy = -15; // 給予向上跳的初速度
+                    player.vy = -15; 
                 }
 
                 // =====================================
-                // 迷宮移動邏輯 (包含撞牆判斷)
+                // 🚀 2. 移動指令 (迴圈連續技模式)
                 // =====================================
-                let nextC = player.c;
-                let nextR = player.r;
+                // 將長句子用空白切成單字陣列
+                const words = result.split(" ");
+                
+                // 逐字判斷並移動
+                for (let i = 0; i < words.length; i++) {
+                    let word = words[i];
+                    let nextC = player.c;
+                    let nextR = player.r;
 
-                if (result.includes("go up") || result.includes("up")) nextR--;
-                else if (result.includes("go down") || result.includes("down")) nextR++;
-                else if (result.includes("go left") || result.includes("left")) nextC--;
-                else if (result.includes("go right") || result.includes("right")) nextC++;
+                    if (word === "up") nextR--;
+                    else if (word === "down") nextR++;
+                    else if (word === "left") nextC--;
+                    else if (word === "right") nextC++;
 
-                // 判斷目標格子是否超出邊界，或是撞到牆壁 (數值為 1)
-                if (nextR >= 0 && nextR < mazeGrid.length && nextC >= 0 && nextC < mazeGrid[0].length) {
-                    if (mazeGrid[nextR][nextC] === 0) {
-                        player.c = nextC; // 允許移動
-                        player.r = nextR;
-                    } else {
-                        console.log("撞到牆壁啦！");
+                    // 判斷是否撞牆
+                    if (nextR >= 0 && nextR < mazeGrid.length && nextC >= 0 && nextC < mazeGrid[0].length) {
+                        if (mazeGrid[nextR][nextC] === 0) {
+                            player.c = nextC; // 是路，就更新格子座標
+                            player.r = nextR;
+                        } else {
+                            console.log("💥 撞牆中斷！卡在單字:", word);
+                        }
                     }
                 }
 
                 // =====================================
-                // 屬性變化
+                // 3. 屬性變化
                 // =====================================
                 if (result.includes("red")) player.tintColor = color(255, 100, 100);
                 if (result.includes("green")) player.tintColor = color(100, 255, 100);
